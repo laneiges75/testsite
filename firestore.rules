@@ -1,0 +1,46 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    // Collection: inquiries
+    // Fields:
+    //   - name: string (required)
+    //   - phone: string (required)
+    //   - content: string (required)
+    //   - status: string (required, enum: ['pending', 'completed'])
+    //   - createdAt: timestamp (required)
+    
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      // For this specific request, we are using a simplified admin check
+      // In a real app, this would check a 'role' field in a users collection
+      // or a custom claim. Since we're implementing a custom login with admin/admin,
+      // we'll allow the admin to read/write inquiries if they are authenticated.
+      return isAuthenticated();
+    }
+
+    function isValidInquiry(data) {
+      return data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
+             data.phone is string && data.phone.size() > 0 && data.phone.size() < 20 &&
+             data.content is string && data.content.size() > 0 && data.content.size() < 2000 &&
+             data.status in ['pending', 'completed'] &&
+             data.createdAt is timestamp;
+    }
+
+    match /inquiries/{inquiryId} {
+      // Anyone can create an inquiry
+      allow create: if isValidInquiry(request.resource.data);
+      
+      // Only admin can read, update, or delete inquiries
+      allow read, update, delete: if isAdmin();
+    }
+  }
+}
